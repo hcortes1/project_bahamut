@@ -8,21 +8,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project
 **Flujo**: Windows-only (10/11) Electron + TypeScript (strict) + Node.js budgeting app. Single user, one machine, per-user install. Fully offline, USD only, local SQLite. Imports Bank of America PDF statements and CSVs; has a dashboard and a budget optimizer.
 
-## Progress (agents stopped by the user; resume here)
-Last full check (before the IPC work started): `tsc`, `eslint`, `npm run build` clean; 428 vitest tests in 25 files pass. `git init` done locally; nothing committed or pushed.
+## Progress (resume here)
+Local git only (3 commits on `master`: initial, IPC layer, renderer); nothing pushed. Last check: `tsc`, `eslint`, `npm run build` clean; 82 vitest tests in 9 files pass.
 
-**Done (Sonnet wrote, Opus reviewed once, fixes applied):**
-- Scaffold: electron-vite, hardened main (`src/main/security.ts` URL allowlist, single-instance, `FLUJO_USER_DATA_DIR` override only when unpackaged), CSP, NSIS per-user installer.
-- `src/main/db`: schema + migrations v1/v2, repos, dashboard aggregates; `rules-repo`, `analysis-repo`, `features-repo`.
-- `src/main/auth`: scrypt, mutex-serialised lockout, `SqliteAuthStore`, `SessionManager`.
-- `src/main/ingest`: CSV parser, BofA PDF parser (runs in `pdf-worker.js` via `pdf/runner.ts`), normalization (`NORMALIZATION_VERSION`), fingerprints, `pipeline/` (review session, duplicates, atomic commit, retention). `node tests/packaged/pdf-smoke.mjs` checks a packaged PDF parse.
-- `src/main/analysis`: categorizer + Naive Bayes learning, optimizer/subscriptions/anomalies (worker entry `optimizer-worker.js`). `src/main/features`: transfers, balances, recurring, goals, net worth, budget progress, CSV export.
+**Environment gotchas**
+- `better-sqlite3`@13 needs Node >=22 (Node 20 segfaults). On this Linux box use `PATH=/home/hernanc/.local/node22/node_modules/.bin:$PATH` before node/npm/npx. No display here, so Electron/Playwright e2e cannot run; run it on Windows.
+- `.gitignore` line 49 ignores `tests/` (the old 428 tests were lost; ~82 new ones exist locally but are not tracked). Ask the user before changing it. Do not use `git add -f`.
+- `CLAUDE.md`, `deploy.md`, `instructions.md`, `workflow.md` are already tracked from the initial commit: before any push request SEC-2c checks fail until they are untracked (`git rm --cached`, with approval).
+- Stitch MCP is configured locally with an API key (user's `~/.claude.json`); never print it. Subagents cannot call Stitch; the main session must.
 
-**Stopped mid-task (resume these):**
-1. **Opus re-review of both fix passes** was killed before reporting. Re-run it (code-reviewer, opus) on db/auth/ingest; nothing from it is known.
-2. **IPC layer ~10% done.** `src/shared/ipc.ts` (~750 lines, ~95 channels, zod request schemas, `FlujoApi` type) and a stub `src/main/ipc/errors.ts` exist and typecheck. Bug: line 171 `accounts.update` regex reads `/^d{4}$/`, must be `/^[0-9]{4}$/`. The agent was denied further edits to `ipc.ts`; check permissions before continuing. NOT started: `src/main/ipc/` handlers (design: injected context, order = sender validation, LOCKED gate on all channels except `auth.status/setup/verify/forgot`, `session.activity()`, zod parse, handler; lock discards import sessions and cancels password prompts; `optimizer.acceptSuggestedBudget` reads the amount from main, not the renderer; wipe closes DB, deletes db/wal/shm, reopens fresh), `src/preload/index.ts` + `global.d.ts`, `src/main/index.ts` wiring (open DB, migrate, one `AuthManager`, `SessionManager`), unit tests in `tests/unit/ipc/`, Playwright e2e.
-3. **Frontend (React UI) not started; Stitch designs partial.** Subagents cannot call Stitch tools; the main session must. Stitch project `9076135701702188827`, design system `assets/15019863195480235708`. Generation only works with `modelId: GEMINI_3_5_FLASH_LITE`, short prompts, and few calls at once. Screens made so far: lock, dashboard, import review, optimizer, transactions (`297b4086f7b1426aa8f4737a59173322`), budgets + bills (`76743c9206414406805998e9accd7fa1`). Still to design: goals + net worth, settings, first-run setup, accounts. Nothing downloaded to `design/` yet (use `download_file`). Stitch copy says "vault"/"encrypted"/"vault.db": do not reuse; the app lock is not encryption. Credit-card imports need a confirm-all action (every row is low confidence by design). After designs, delegate implementation to `voltagent-core-dev:frontend-developer` or `ui-designer`.
-4. Not done: Phase tests for definition of done (section 15) end to end, `package.json` script for the packaged PDF smoke test, final packaged-build smoke test of the whole app, `deploy.md` text still mentions a native rebuild that no longer exists.
+**Done (Sonnet wrote, Opus reviewed, fixes applied):**
+- Scaffold: electron-vite, hardened main (`src/main/security.ts` URL allowlist, single-instance, `FLUJO_USER_DATA_DIR` only when unpackaged), CSP, NSIS per-user installer.
+- Backend: `db` (migrations v1/v2, repos, aggregates), `auth` (scrypt, lockout, `SessionManager`), `ingest` (CSV, BofA PDF worker, pipeline), `analysis` (categorizer, optimizer worker), `features`. Opus re-review of the earlier db/auth/ingest fix passes was skipped by the user's decision.
+- IPC (`src/main/ipc/`, `src/shared/ipc.ts`, `channel-names.ts`, `src/preload`): gate order sender -> LOCKED -> zod -> handler; idle lock driven by window `input-event`; lock clears imports/prompts/optimizer cache; wipe always reopens the DB and deletes db/wal/shm, `backups/`, `imports/`. Opus-reviewed (1 cycle, fixes applied).
+- Renderer (`src/renderer/src/`): shell, Lock, Setup, Accounts, Settings, Transactions, Budgets+bills, Goals+net worth, Dashboard, Import+review, Optimizer. Layout reference and mandatory copy corrections: `design/stitch-reference.txt`. Opus-reviewed (1 cycle, fixes applied, not re-reviewed). Credit-card confirm-all is a deliberate deviation from instructions §7.3.
+
+**Open (resume these):**
+1. **Decisions needed from the user:** anomaly markers on import review rows (§7.3, needs main-side anomaly rules on parsed rows); "delete import" for imports without a kept file (§12); detected-but-unconfirmed subscriptions appear as active bills (suggest status `detected`); dead code to review (`parseAmountInput` in `lib/format.ts`).
+2. Opus re-review of the renderer review fixes (cycle 2 of 3).
+3. Playwright Electron e2e on Windows (tests/e2e): lock/lockout, setup, import -> review -> commit -> dashboard totals, no network calls, wipe, `senderFrame === mainFrame` check (a mismatch would block every IPC call), native `<dialog>` focus, month input, chart rendering.
+4. Definition of done (§15) end to end, `package.json` script for `tests/packaged/pdf-smoke.mjs`, packaged-build smoke test, `deploy.md` still mentions a native rebuild that no longer exists, main JS bundle ~1.15 MB (no code splitting).
 
 ## Backlog
 Never start, scaffold, or test without explicit user approval: multi-machine sync (`.budgetsync`, instructions §6), disk-encryption verification/notice, in-app backup/restore (instructions §16). Do not claim the DB is encrypted or that the app lock is cryptographic.
@@ -89,8 +94,8 @@ Main session orchestrates; delegate whenever a specialist exists, and check the 
 
 ## Capability inventory (refresh when it changes)
 - MCP available: Context7, Stitch, Playwright (do not use for REV/DBG), GitHub (subject to SEC-1), Microsoft Learn, Todoist, Google Drive/Calendar, Claude Docs. Failed to connect: vercel, definite.
-- Agents: `code-reviewer`, `debugger`, `ui-designer`, `deploy-helper`, `docs-writer`, `Explore`, `Plan`, plus `voltagent-*` specialists (frontend, backend, electron-pro, security, qa).
-- Skills: `anthropic-skills:pdf|xlsx|docx`, `code-review`, `simplify`, `security-review`.
+- Agents seen in the last session: only `general-purpose`, `Explore`, `Plan`, `claude-code-guide`, `web-fetch` (no `ui-designer`/`voltagent-*`/`code-reviewer`). The user approved a general-purpose Sonnet subagent with the `frontend-design:frontend-design` skill as frontend implementer, and a general-purpose Opus subagent as reviewer (set `model` explicitly). Re-check `/agents` each session.
+- Skills: `frontend-design:frontend-design`, `anthropic-skills:pdf|xlsx|docx`, `code-review`, `simplify`, `security-review`.
 
 ## CLAUDE.md limit
 Must stay at 150 lines or fewer; check with `wc -l CLAUDE.md` after every edit and point to workflow.md/instructions.md instead of duplicating.
