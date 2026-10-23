@@ -1,0 +1,31 @@
+appId: com.flujo.app
+productName: Flujo
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+  - "!build/**"
+  - "!node_modules/better-sqlite3/build/**"
+  - "!node_modules/better-sqlite3/deps/**"
+  - "!node_modules/better-sqlite3/src/**"
+  - "!node_modules/better-sqlite3/prebuilds/*"
+  - "node_modules/better-sqlite3/prebuilds/win32-x64.node"
+npmRebuild: false
+asar: true
+asarUnpack:
+  - "**/*.node"
+  - node_modules/pdfjs-dist/legacy/build/**
+  - node_modules/pdfjs-dist/standard_fonts/**
+  - node_modules/pdfjs-dist/cmaps/**
+  - node_modules/pdfjs-dist/iccs/**
+  - node_modules/pdfjs-dist/wasm/**
+  - node_modules/pdfjs-dist/package.json
+publish: null
+win:
+  target: nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  deleteAppDataOnUninstall: false
