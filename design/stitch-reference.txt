@@ -1,0 +1,56 @@
+FLUJO UI REFERENCE (from Stitch project 9076135701702188827, design system assets/15019863195480235708)
+Layout/visual reference ONLY. The generated HTML must NOT be copied. Build React components that follow the
+layout below and the MANDATORY CORRECTIONS at the end.
+
+DESIGN TOKENS (use these; Stitch screens drift between palettes)
+- Primary #1f6f5c, on-primary #fff, primary-container #a2f4df / on-primary-container #002118
+- Secondary #4a635b, secondary-container #cce8de (active nav item bg)
+- Surface #f8faf9, surface-container-low #f2f4f3, surface-variant #dbe4e0, on-surface #191c1b, on-surface-variant #3f4945
+- Outline #6f7975, outline-variant #bfc9c4
+- Error (over budget / negative) #ba1a1a with an icon; positive = green with an icon; warning = amber. Never color alone.
+- Font Inter (bundle locally), tabular numerals for all money, radius 4/8/12px, ROUND_EIGHT
+- Light + dark themes, Windows high-contrast (forced-colors), visible focus rings, full keyboard navigation
+
+SHELL
+- Left nav rail w-64: brand block (Flujo + "Personal"), links: Dashboard, Accounts, Transactions, Budgets (incl. recurring bills),
+  Goals & Net Worth, Optimizer, Import, Reports/Export, Settings. Active item = secondary-container bg, bold, filled icon.
+- Footer of rail: app version only, plus a Lock button. Content area scrolls independently, padding p-8.
+
+SCREENS
+1. Lock: centered 480px card on plain background. Logo + "Flujo". Tabs "PIN" / "Password" (only the credentials that are set up;
+   if both are set, both fields are required). PIN dots + keypad is optional; a plain password-type input is fine.
+   Unlock button (Enter submits). Lockout state: amber notice with countdown (mm:ss) + progress bar, inputs disabled.
+   "Forgot credentials?" expander: "Flujo is 100% offline. Forgotten credentials can only be recovered by wiping local data."
+   + destructive "Wipe all local data..." (confirmation naming exactly what is deleted, see Settings).
+2. First-run setup: modal-like wizard card (max-w-3xl), 3-step stepper: 1 Credentials (PIN 4-8 digits and/or password min 8,
+   at least one), 2 First account (name, type checking/savings/credit card, institution, last 4), 3 Statement import (file picker).
+   Info box with the honest recovery note. No "Skip for now" (a credential is required).
+3. Accounts: header + "Add account" button; summary cards (Net worth, Cash, Assets, Debt) built from real data; table
+   (name, type, institution, last 4, latest balance, actions); row opens right drawer (w-96) with balance snapshot history chart
+   + data-table fallback + "record balance" form; delete opens modal that states exactly what is deleted (the account, its
+   transactions, balance snapshots), type DELETE to confirm.
+4. Transactions: top bar (title, search, Transfer button, Add transaction); filter bar (date range, account, category, "Showing x of y");
+   table (date, merchant, category, account, amount; transfers show a Transfer badge and "Excluded from totals"; expense red + icon,
+   income green + icon); pagination; right sticky panel for new/edit transaction with Expense/Income/Transfer toggle.
+5. Settings (max-w-4xl, stacked section cards): Security (change credential, idle timeout, lock on minimize), Imports (keep source
+   files, confidence threshold), Learned categorization rules (table: pattern, category, weight; edit/delete), Data (Export CSV with
+   date range; Wipe all local data).
+6. Budgets + recurring bills (Stitch screen 76743c9206414406805998e9accd7fa1), Goals + net worth, Dashboard, Import review, Optimizer
+   have no saved reference here: build from instructions.md sections 7.3, 9, 10, 11 and the same shell/tokens. Dashboard: Chart.js
+   charts each with a data-table toggle. Import review: low-confidence rows highlighted and individually confirm/edit/exclude,
+   duplicate side-by-side prompt, CSV mapping panel, credit-card "confirm all" action.
+
+MANDATORY CORRECTIONS (Stitch output violates these; never reproduce)
+- NO claims of encryption, "vault", "vault.db", "AES-256", "DPAPI", "Argon2", "Local Vault", "Offline Vault Encrypted". The app lock is an
+  access gate, not encryption. Say "local data" / "database". Do not mention hardware keys, Windows Hello or TPM.
+- NO "Sync Data" button or any sync/backup/restore UI (backlog, instructions.md section 16). NO disk-encryption notice.
+- NO external resources: no Tailwind CDN, no Google Fonts, no Material Symbols from Google CDN, no remote images (avatars). Bundle fonts and
+  icons locally; the CSP is default-src 'self'. Prefer plain CSS/CSS modules or locally built tooling.
+- NO fake user ("Alex Morgan"), fake window chrome (traffic-light dots, title bar controls), fake status bars/telemetry text, or file paths.
+- Wipe confirmation must state exactly: the database, pre-migration backups, AND kept statement files (imports folder) are deleted.
+  (Stitch wrongly says kept files remain.) Requires current credentials.
+- Account types are only checking, savings, credit_card (no "Investment"). Money is integer cents, formatted USD only.
+- Account delete / import delete / wipe all need a confirmation that states exactly what will be deleted.
+- Idle lock is driven by the main process; UI shows no timers except the lockout countdown. Handle the session.locked event by
+  clearing all renderer state.
+- Renderer talks only to window.flujo (src/preload, typed by FlujoApi in src/shared/ipc.ts); every call returns Result<T>; no Node access.

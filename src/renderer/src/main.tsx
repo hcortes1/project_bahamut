@@ -1,6 +1,11 @@
+import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import '@fontsource-variable/inter'
+import './styles.css'
+import { App } from './App'
 
-// Exercises the preload type declaration (src/preload/global.d.ts) in typecheck.
-const appName: string = window.flujo.appName
-
-createRoot(document.getElementById('root')!).render(<h1>{appName}</h1>)
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+)

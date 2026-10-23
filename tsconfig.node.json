@@ -15,5 +15,5 @@
     "noEmit": true,
     "paths": { "@shared/*": ["./src/shared/*"] }
   },
-  "include": ["electron.vite.config.ts", "vitest.config.ts", "playwright.config.ts", "src/main/**/*", "src/preload/**/*", "src/shared/**/*", "tests/**/*"]
+  "include": ["electron.vite.config.ts", "vitest.config.ts", "playwright.config.ts", "src/main/**/*", "src/preload/**/*", "src/shared/**/*", "src/renderer/src/lib/api.ts", "src/renderer/src/lib/format.ts", "src/renderer/src/lib/lockState.ts", "src/renderer/src/lib/amounts.ts", "src/renderer/src/lib/dashboardShape.ts", "src/renderer/src/lib/optimizerLogic.ts", "src/renderer/src/lib/importLogic.ts", "src/renderer/src/lib/goalText.ts", "src/renderer/src/lib/months.ts", "tests/**/*"]
 }
