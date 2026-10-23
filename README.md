@@ -1,6 +1,6 @@
 # Flujo
 
-Offline Windows budgeting app (Electron + React + TypeScript, local SQLite). It imports Bank of America PDF statements and CSV files and shows a dashboard and a budget optimizer. Nothing leaves your machine. The app lock is an access gate, not encryption.
+Offline Windows budgeting app (Electron + React + TypeScript, local SQLite). It imports Bank PDF statements and CSV files and shows a dashboard and a budget optimizer.The app lock is an access gate, not encryption. There are no external connections and you do not have to link your bank account to start analyzing your spending habits.
 
 ## Setup
 
