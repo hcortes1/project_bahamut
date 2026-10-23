@@ -93,8 +93,9 @@ export interface SubscriptionRecord {
 /**
  * Insert detected subscriptions into recurring_items, or refresh amount/cadence/next_due of existing
  * rows (matched by merchant name). The user's status (confirmed/rejected) is never overwritten.
+ * Returns the record id for each input subscription, in input order.
  */
-export function persistSubscriptions(db: Db, subs: readonly Subscription[]): number {
+export function persistSubscriptions(db: Db, subs: readonly Subscription[]): string[] {
   const t = now()
   const find = db.prepare(
     'SELECT id FROM recurring_items WHERE is_subscription=1 AND name=? AND deleted_at IS NULL'
@@ -106,18 +107,21 @@ export function persistSubscriptions(db: Db, subs: readonly Subscription[]): num
     `INSERT INTO recurring_items (id,name,amount_cents,cadence,next_due,category_id,is_subscription,status,created_at,updated_at)
      VALUES (?,?,?,?,?,?,1,'active',?,?)`
   )
-  let inserted = 0
+  const ids: string[] = []
   db.transaction(() => {
     for (const s of subs) {
       const ex = find.get(s.merchant) as { id: string } | undefined
-      if (ex) upd.run(s.amountCents, s.cadence, s.nextExpected, s.categoryId, t, ex.id)
-      else {
-        ins.run(randomUUID(), s.merchant, s.amountCents, s.cadence, s.nextExpected, s.categoryId, t, t)
-        inserted++
+      if (ex) {
+        upd.run(s.amountCents, s.cadence, s.nextExpected, s.categoryId, t, ex.id)
+        ids.push(ex.id)
+      } else {
+        const id = randomUUID()
+        ins.run(id, s.merchant, s.amountCents, s.cadence, s.nextExpected, s.categoryId, t, t)
+        ids.push(id)
       }
     }
   })()
-  return inserted
+  return ids
 }
 
 export function listSubscriptionRecords(db: Db): SubscriptionRecord[] {
@@ -183,27 +187,32 @@ export interface FlagRecord {
 
 /**
  * Persist newly detected flags. A flag already stored for the same (transaction, reason) is skipped
- * whatever its status, so dismissed or confirmed flags do not reappear. Returns the number inserted.
+ * whatever its status, so dismissed or confirmed flags do not reappear. Returns the record id for each
+ * input flag (new or already stored), in input order.
  */
-export function persistFlags(db: Db, flags: readonly AnomalyFlag[]): number {
+export function persistFlags(db: Db, flags: readonly AnomalyFlag[]): string[] {
   const t = now()
   const exists = db.prepare(
-    'SELECT 1 FROM anomaly_flags WHERE transaction_id=? AND reason_code=? AND deleted_at IS NULL'
+    'SELECT id FROM anomaly_flags WHERE transaction_id=? AND reason_code=? AND deleted_at IS NULL'
   )
   const ins = db.prepare(
     `INSERT INTO anomaly_flags (id,transaction_id,reason_code,severity,status,reason,created_at,updated_at)
      VALUES (?,?,?,?, 'open', ?, ?, ?)`
   )
-  let n = 0
+  const ids: string[] = []
   db.transaction(() => {
     for (const f of flags) {
-      if (exists.get(f.transactionId, f.reasonCode)) continue
+      const ex = exists.get(f.transactionId, f.reasonCode) as { id: string } | undefined
+      if (ex) {
+        ids.push(ex.id)
+        continue
+      }
       const id = randomUUID()
       ins.run(id, f.transactionId, f.reasonCode, f.severity, f.reason, t, t)
-      n++
+      ids.push(id)
     }
   })()
-  return n
+  return ids
 }
 
 export function listFlags(db: Db, status?: FlagStatus): FlagRecord[] {

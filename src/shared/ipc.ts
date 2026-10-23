@@ -28,6 +28,9 @@ import {
   type MonthlyTotals,
   type Transaction
 } from './db-types'
+import { CHANNEL_NAMES, EVENT_LOCKED, EVENT_PASSWORD_PROMPT } from './channel-names'
+
+export { CHANNEL_NAMES, EVENT_LOCKED, EVENT_PASSWORD_PROMPT }
 
 // ------------------------------------------------------------------ results and errors
 
@@ -52,7 +55,9 @@ export const KNOWN_ERROR_CODES = [
   'INTERNAL',
   'CANCELLED',
   'TOO_MANY_OPEN_IMPORTS',
-  'OPTIMIZER_FAILED'
+  'OPTIMIZER_FAILED',
+  'FILE_TOO_LARGE',
+  'FILE_UNREADABLE'
 ] as const
 
 // ------------------------------------------------------------------ request building blocks
@@ -168,7 +173,7 @@ export const channels = {
   // accounts + balance snapshots
   'accounts.list': ch<Account[]>()(noArgs),
   'accounts.create': ch<Account>()(NewAccount),
-  'accounts.update': ch<Account>()(patchOf({ name: NewAccount.shape.name, type: AccountType, institution: z.string().max(200).nullable(), last4: z.string().regex(/^d{4}$/).nullable() })),
+  'accounts.update': ch<Account>()(patchOf({ name: NewAccount.shape.name, type: AccountType, institution: z.string().max(200).nullable(), last4: z.string().regex(/^[0-9]{4}$/).nullable() })),
   'accounts.delete': ch<boolean>()(idOnly),
   'accounts.recordBalance': ch<BalanceDto>()(z.strictObject({ accountId: id, date: IsoDate, balanceCents: safeCents })),
   'accounts.listBalances': ch<BalanceDto[]>()(z.strictObject({ accountId: id })),
@@ -331,6 +336,12 @@ export const channels = {
 } as const
 
 export type ChannelName = keyof typeof channels
+
+/** Compile-time check that CHANNEL_NAMES and `channels` list exactly the same names. */
+type AssertNever<T extends never> = T
+export type ChannelNamesInSync = AssertNever<
+  Exclude<ChannelName, (typeof CHANNEL_NAMES)[number]> | Exclude<(typeof CHANNEL_NAMES)[number], ChannelName>
+>
 export type ChannelRequest<K extends ChannelName> = z.input<(typeof channels)[K]['request']>
 export type ChannelResponse<K extends ChannelName> = (typeof channels)[K] extends { __res(r: infer R): void } ? R : never
 
@@ -339,8 +350,6 @@ export const PUBLIC_CHANNELS: readonly ChannelName[] = (Object.keys(channels) as
 
 // ------------------------------------------------------------------ events (main -> renderer)
 
-export const EVENT_LOCKED = 'session.locked'
-export const EVENT_PASSWORD_PROMPT = 'imports.passwordPrompt'
 
 export interface LockedEvent {
   reason: 'idle' | 'minimize' | 'manual'
@@ -661,6 +670,8 @@ export interface CategoryStatDto {
   monthlyCents: number[]
 }
 export interface SubscriptionDto {
+  /** Id of the stored recurring item; use it with optimizer.confirmSubscription / rejectSubscription. */
+  recordId: string
   merchant: string
   amountCents: number
   cadence: 'weekly' | 'monthly' | 'annual'
@@ -676,6 +687,8 @@ export interface SubscriptionDto {
   status: 'detected' | 'confirmed'
 }
 export interface AnomalyFlagDto {
+  /** Id of the stored flag; use it with optimizer.markFlagLegitimate / markFlagSuspicious. */
+  recordId: string
   transactionId: string
   reasonCode: string
   severity: 'low' | 'medium' | 'high'

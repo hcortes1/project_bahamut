@@ -38,3 +38,31 @@ export function describeUrl(raw: string): string {
     return '[unparseable url]'
   }
 }
+
+export interface AppFrameOptions {
+  /** file: URL of the built renderer index.html (packaged / non-dev builds). */
+  indexFileUrl: string
+  /** ELECTRON_RENDERER_URL (dev server); ignored when packaged. */
+  devUrl?: string | undefined
+  packaged: boolean
+}
+
+/** True only for the app's own page: the exact index.html (ignoring #hash), or the dev server origin root. */
+export function isAppFrameUrl(raw: string, opts: AppFrameOptions): boolean {
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    return false
+  }
+  if (!opts.packaged && opts.devUrl) {
+    try {
+      const dev = new URL(opts.devUrl)
+      return url.origin === dev.origin && url.pathname === '/' && url.search === ''
+    } catch {
+      return false
+    }
+  }
+  url.hash = ''
+  return url.href === opts.indexFileUrl
+}

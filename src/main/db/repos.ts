@@ -486,3 +486,21 @@ export function topMerchants(db: Db, f: AggregateFilter, limit = 10): MerchantSp
       .all({ ...aggParams(f), limit: lim })
   )
 }
+
+/**
+ * The transactions behind one spendingByCategory row (same filter and spending rules, so the rows sum to
+ * that category's total). Uncategorized (NULL category) rows match the Uncategorized system id.
+ */
+export function spendingTransactions(db: Db, f: AggregateFilter, categoryId: string, limit?: number, offset?: number): Transaction[] {
+  if (limit !== undefined) PageLimit.parse(limit)
+  if (offset !== undefined) z.number().int().min(0).parse(offset)
+  return parseAll(
+    Transaction,
+    db
+      .prepare(
+        `SELECT t.* ${AGG_FROM} AND ${IS_SPENDING} AND COALESCE(t.category_id, @uncat) = @categoryId
+         ORDER BY t.date DESC, t.created_at DESC, t.id LIMIT @limit OFFSET @offset`
+      )
+      .all({ ...aggParams(f), uncat: UNCATEGORIZED_CATEGORY_ID, categoryId, limit: limit ?? -1, offset: offset ?? 0 })
+  )
+}
